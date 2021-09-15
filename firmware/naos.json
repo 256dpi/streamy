@@ -1,0 +1,7 @@
+{
+  "version": "master",
+  "overrides": null,
+  "components": {},
+  "broker": "mqtts://key:secret@example.org",
+  "devices": {}
+}
