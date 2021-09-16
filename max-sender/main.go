@@ -1,190 +1,109 @@
 package main
 
 import (
-	"time"
+	"math"
 
-	"github.com/256dpi/gomqtt/client"
-	"github.com/256dpi/gomqtt/packet"
 	"github.com/256dpi/max-go"
+
+	"streamy"
 )
 
-type mqtt struct {
-	cmd   *max.Inlet
-	state *max.Outlet
-	data  *max.Outlet
-	svc   *client.Service
-	url   string
-	id    string
+type sender struct {
+	signal *max.Inlet
+	cmd    *max.Inlet
+	state  *max.Outlet
+	queue  *max.Outlet
+	stream *streamy.Stream
 }
 
-func (m *mqtt) Init(obj *max.Object, args []max.Atom) bool {
+func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
 	// declare inlets
-	m.cmd = obj.Inlet(max.Any, "commands", true)
+	s.signal = obj.Inlet(max.Signal, "input", true)
+	s.cmd = obj.Inlet(max.Any, "commands", true)
 
 	// declare outlets
-	m.state = obj.Outlet(max.Int, "connection state")
-	m.data = obj.Outlet(max.List, "incoming messages ")
+	s.state = obj.Outlet(max.Int, "connection state")
+	s.queue = obj.Outlet(max.Int, "device queue")
 
-	// create service
-	m.svc = client.NewService(100)
-
-	// drop commands if not queued withing 1ms
-	m.svc.QueueTimeout = time.Millisecond
-
-	// register online callback
-	m.svc.OnlineCallback = func(resumed bool) {
-		// set state
-		m.state.Int(1)
-	}
-
-	// register message callback
-	m.svc.MessageCallback = func(message *packet.Message) error {
-		// send as list
-		m.data.List([]max.Atom{message.Topic, string(message.Payload), int64(message.QOS), bool2int64(message.Retain)})
-
-		return nil
-	}
-
-	// register error callback
-	m.svc.ErrorCallback = func(err error) {
-		// log error
-		max.Error("mqtt: %s", err.Error())
-	}
-
-	// register offline callback
-	m.svc.OfflineCallback = func() {
-		// set state
-		m.state.Int(0)
-	}
-
-	// get url
+	// get broker
+	var broker string
 	if len(args) > 0 {
-		m.url, _ = args[0].(string)
+		broker, _ = args[0].(string)
 	}
 
-	// get id
+	// get name
+	var name string
 	if len(args) > 1 {
-		m.id, _ = args[1].(string)
+		name, _ = args[1].(string)
 	}
+
+	// get base
+	var base string
+	if len(args) > 2 {
+		base, _ = args[2].(string)
+	}
+
+	// create stream
+	s.stream = streamy.NewStream(streamy.Config{
+		Broker: broker,
+		Name:   name,
+		Base:   base,
+		Info: func(str string) {
+			// handle message
+			switch str {
+			case "online":
+				s.state.Int(1)
+			case "offline":
+				s.state.Int(0)
+			default:
+				max.Log(str)
+			}
+		},
+		Queue: func(length int) {
+			// set length
+			s.queue.Int(int64(length))
+		},
+		SampleRate:  44100,
+		BitRate:     16,
+		DeviceQueue: 16,
+	})
 
 	return true
 }
 
-func (m *mqtt) Handle(_ int, msg string, args []max.Atom) {
+func (s *sender) Handle(_ int, msg string, args []max.Atom) {
 	// handle message
 	switch msg {
 	case "connect":
-		m.connect()
+		s.stream.Connect()
+	case "reset":
+		s.stream.Reset()
 	case "disconnect":
-		m.disconnect()
+		s.stream.Disconnect()
 	default:
 		max.Error("unknown message %s", msg)
 	}
 }
 
-func (m *mqtt) connect() {
-	// prepare config
-	config := client.NewConfigWithClientID(m.url, m.id)
-	config.MaxWriteDelay = time.Millisecond
+// TODO: Buffer some data before start writing?
 
-	// start service
-	m.svc.Start(config)
+func (s *sender) Process(in, _ []float64) {
+	// convert data
+	data := make([]int, len(in))
+	for i, sample := range in {
+		data[i] = int(sample * math.MaxInt16)
+	}
+
+	// write data
+	s.stream.Write(data)
 }
 
-// func (m *mqtt) subscribe(args []max.Atom) {
-// 	// get topic
-// 	var topic string
-// 	if len(args) > 0 {
-// 		topic, _ = args[0].(string)
-// 	}
-//
-// 	// get qos
-// 	var qos int64
-// 	if len(args) > 1 {
-// 		qos, _ = args[1].(int64)
-// 	}
-//
-// 	// check topic
-// 	if topic == "" {
-// 		max.Error("missing topic")
-// 		return
-// 	}
-//
-// 	// check qos
-// 	if !packet.QOS(qos).Successful() {
-// 		max.Error("invalid qos")
-// 		return
-// 	}
-//
-// 	// subscribe
-// 	m.svc.Subscribe(topic, packet.QOS(qos))
-// }
-//
-// func (m *mqtt) publish(args []max.Atom) {
-// 	// get topic
-// 	var topic string
-// 	if len(args) > 0 {
-// 		topic, _ = args[0].(string)
-// 	}
-//
-// 	// get payload
-// 	var payload []byte
-// 	if len(args) > 1 {
-// 		switch arg := args[1].(type) {
-// 		case int64:
-// 			payload = []byte(strconv.FormatInt(arg, 10))
-// 		case float64:
-// 			payload = []byte(strconv.FormatFloat(arg, 'f', -1, 64))
-// 		case string:
-// 			payload = []byte(arg)
-// 		}
-// 	}
-//
-// 	// get qos
-// 	var qos int64
-// 	if len(args) > 2 {
-// 		qos, _ = args[2].(int64)
-// 	}
-//
-// 	// get retain
-// 	var retain bool
-// 	if len(args) > 3 && args[3] == 1 {
-// 		retain = true
-// 	}
-//
-// 	// check topic
-// 	if topic == "" {
-// 		max.Error("missing topic")
-// 		return
-// 	}
-//
-// 	// check qos
-// 	if !packet.QOS(qos).Successful() {
-// 		max.Error("invalid qos")
-// 		return
-// 	}
-//
-// 	// publish
-// 	m.svc.Publish(topic, payload, packet.QOS(qos), retain)
-// }
-
-func (m *mqtt) disconnect() {
-	// stop service
-	m.svc.Stop(true)
-}
-
-func (m *mqtt) Free() {
-	m.disconnect()
+func (s *sender) Free() {
+	// disconnect
+	s.stream.Disconnect()
 }
 
 func main() {
 	// initialize Max class
-	max.Register("streamy", &mqtt{})
-}
-
-func bool2int64(b bool) int64 {
-	if b {
-		return 1
-	}
-	return 0
+	max.Register("streamy", &sender{})
 }
