@@ -1,4 +1,4 @@
-module sender
+module streamy
 
 go 1.16
 
