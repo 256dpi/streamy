@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/256dpi/gomqtt/client"
@@ -21,12 +22,18 @@ var sound []byte
 
 const broker = "mqtt://localhost:1883"
 
+const queueLength = 16
+const sampleRate = 44100
+
 func main() {
+	// prepare handle
+	var handle *stream
+
 	// create service
 	svc := client.NewService(100)
 
 	// subscribe topics
-	svc.Subscribe("/test/audio", 0)
+	svc.Subscribe("/test/queue", 0)
 
 	// set state callbacks
 	svc.OnlineCallback = func(resumed bool) {
@@ -41,47 +48,61 @@ func main() {
 
 	// set message callback
 	svc.MessageCallback = func(msg *packet.Message) error {
-		fmt.Println(msg.String())
+		length, _ := strconv.Atoi(string(msg.Payload))
+		if handle != nil {
+			handle.queue = length
+		}
 		return nil
 	}
 
 	// start service
 	svc.Start(client.NewConfigWithClientID(broker, "sender"))
 
-	// handle
-	var stop, done chan struct{}
-
 	// scan lines
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		switch scanner.Text() {
 		case "start":
-			if stop != nil {
-				fmt.Println("==> already streaming")
+			if handle != nil {
 				continue
 			}
-			fmt.Println("==> started stream")
-			stop = make(chan struct{})
-			done = make(chan struct{})
-			go stream(svc, stop, done)
+			fmt.Println("==> started")
+			handle = newStream(svc)
+			go handle.run()
 		case "stop":
-			if stop == nil {
-				svc.Publish("/test/stop", nil, 0, false)
-				fmt.Println("==> not streaming")
-				continue
+			if handle != nil {
+				handle.close()
+				handle = nil
+				fmt.Println("==> stopped")
 			}
-			close(stop)
-			<-done
 			svc.Publish("/test/stop", nil, 0, false)
-			stop, done = nil, nil
-			fmt.Println("==> stopped stream")
 		default:
-			fmt.Println("==> unknown command")
+			fmt.Println("==> unknown")
 		}
 	}
 }
 
-func stream(svc *client.Service, stop, done chan struct{}) {
+type stream struct {
+	svc   *client.Service
+	stop  chan struct{}
+	done  chan struct{}
+	queue int
+}
+
+func newStream(svc *client.Service) *stream {
+	return &stream{
+		svc:  svc,
+		stop: make(chan struct{}),
+		done: make(chan struct{}),
+	}
+}
+
+func (s *stream) close() {
+	close(s.stop)
+	<-s.done
+}
+
+func (s *stream) run() {
 	// prepare decoder
 	dec, err := mp3.NewDecoder(bytes.NewReader(sound))
 	if err != nil {
@@ -89,7 +110,7 @@ func stream(svc *client.Service, stop, done chan struct{}) {
 	}
 
 	// check sample rate
-	if dec.SampleRate() != 44100 {
+	if dec.SampleRate() != sampleRate {
 		panic("invalid sample rate")
 	}
 
@@ -99,7 +120,7 @@ func stream(svc *client.Service, stop, done chan struct{}) {
 	// prepare encoder
 	enc := wav.NewEncoder(&writer, dec.SampleRate(), 16, 1, 1)
 
-	// prepare input buffer 1152 samples (10ms) at 16bit/2CH
+	// prepare input buffer 1152 samples (~26ms) @ 16bit/2CH
 	input := make([]byte, 1152*4)
 
 	// prepare integer array
@@ -111,7 +132,6 @@ func stream(svc *client.Service, stop, done chan struct{}) {
 	output.SourceBitDepth = 16
 
 	// stream audio
-	var counter int
 	for {
 		// read sample
 		n, err := dec.Read(input)
@@ -120,7 +140,7 @@ func stream(svc *client.Service, stop, done chan struct{}) {
 		}
 
 		// get samples
-		// samples := n / 4
+		samples := n / 4
 
 		// fill array
 		var num int
@@ -145,20 +165,26 @@ func stream(svc *client.Service, stop, done chan struct{}) {
 		writer.Reset()
 
 		// send chunk
-		svc.Publish("/test/write", chunk, 0, false)
+		s.svc.Publish("/test/write", chunk, 0, false)
 
-		// wait a bit
-		if counter % 30 != 0 {
-			time.Sleep(25 * time.Millisecond)
+		// determine timeout
+		timeout := time.Second * time.Duration(samples) / sampleRate
+		if s.queue < 2 {
+			timeout = 0
+		} else if s.queue < queueLength/2 {
+			timeout /= 2
 		}
 
-		// increment
-		counter++
+		// increment queue
+		s.queue++
+
+		// await timeout
+		time.Sleep(timeout)
 
 		// check close
 		select {
-		case <-stop:
-			close(done)
+		case <-s.stop:
+			close(s.done)
 			return
 		default:
 		}

@@ -16,9 +16,11 @@
 #define SND_SAMPLE_RATE 44100
 #define SND_BIT_RATE 16
 
-#define SND_QUEUE 16
-#define SND_BUFFERS 4
-#define SND_CHUNK 882  // 44100 / 1s * 10ms * 2 bytes
+#define SND_QUEUE_LENGTH 16
+#define SND_DMA_CHUNK 44100 * 10 / 1000 * 2  // 10ms @ 44100Hz/16bit
+#define SND_DMA_CHUNKS 3                     // 30ms
+
+#define SND_UPDATE_MS 100
 
 enum {
   SND_COMMAND_WRITE,
@@ -27,15 +29,18 @@ enum {
 
 typedef struct {
   uint8_t type;
-  uint8_t * chunk;
+  uint8_t* chunk;
   size_t length;
 } snd_command_t;
 
 static QueueHandle_t snd_queue;
 
-static void snd_task(void* _) {
+static void snd_task() {
   // prepare command
   snd_command_t cmd;
+
+  // prepare last update
+  uint32_t last_update = naos_millis();
 
   for (;;) {
     // await next command
@@ -43,21 +48,25 @@ static void snd_task(void* _) {
 
     // handle stop right away
     if (cmd.type == SND_COMMAND_STOP) {
-      i2s_zero_dma_buffer(SND_I2S_NUM);
+      ESP_ERROR_CHECK(i2s_zero_dma_buffer(SND_I2S_NUM))
       continue;
     }
 
     // assert play command
     if (cmd.type != SND_COMMAND_WRITE) {
-      ESP_ERROR_CHECK(ESP_FAIL);
+      ESP_ERROR_CHECK(ESP_FAIL)
     }
 
     // write chunk
     size_t bytes_written = 0;
-    ESP_ERROR_CHECK(i2s_write(SND_I2S_NUM, cmd.chunk, cmd.length, &bytes_written, portMAX_DELAY));
+    ESP_ERROR_CHECK(i2s_write(SND_I2S_NUM, cmd.chunk, cmd.length, &bytes_written, portMAX_DELAY))
 
-    // log
-    naos_log("queue length: %d", uxQueueMessagesWaiting(snd_queue));
+    // check last update
+    uint32_t now = naos_millis();
+    if (last_update + SND_UPDATE_MS < now) {
+      last_update = now;
+      naos_publish_l("queue", (int32_t)uxQueueMessagesWaiting(snd_queue), 0, false, NAOS_LOCAL);
+    }
 
     // free chunk
     free(cmd.chunk);
@@ -66,7 +75,7 @@ static void snd_task(void* _) {
 
 void snd_init() {
   // create queue
-  snd_queue = xQueueCreate(SND_QUEUE, sizeof(snd_command_t));
+  snd_queue = xQueueCreate(SND_QUEUE_LENGTH, sizeof(snd_command_t));
 
   // configure driver
   static const i2s_config_t i2s_config = {
@@ -76,11 +85,11 @@ void snd_init() {
       .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
       .communication_format = I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB,
       .intr_alloc_flags = 0,
-      .dma_buf_count = SND_BUFFERS,
-      .dma_buf_len = SND_CHUNK,
+      .dma_buf_count = SND_DMA_CHUNKS,
+      .dma_buf_len = SND_DMA_CHUNK,
       .use_apll = false,
   };
-  ESP_ERROR_CHECK(i2s_driver_install(SND_I2S_NUM, &i2s_config, 0, NULL));
+  ESP_ERROR_CHECK(i2s_driver_install(SND_I2S_NUM, &i2s_config, 0, NULL))
 
   // configure pins
   static const i2s_pin_config_t pin_config = {
@@ -89,15 +98,18 @@ void snd_init() {
       .data_out_num = SND_PIN_DATA,
       .data_in_num = I2S_PIN_NO_CHANGE,
   };
-  ESP_ERROR_CHECK(i2s_set_pin(SND_I2S_NUM, &pin_config));
+  ESP_ERROR_CHECK(i2s_set_pin(SND_I2S_NUM, &pin_config))
+
+  // zero buffer
+  ESP_ERROR_CHECK(i2s_zero_dma_buffer(SND_I2S_NUM))
 
   // run task
   xTaskCreatePinnedToCore(snd_task, "snd", 2048, NULL, 2, NULL, 1);
 }
 
-void snd_write(uint8_t * data, size_t length) {
+void snd_write(uint8_t* data, size_t length) {
   // copy chunk
-  uint8_t * chunk = malloc(length);
+  uint8_t* chunk = malloc(length);
   memcpy(chunk, data, length);
 
   // prepare command
