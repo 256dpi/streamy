@@ -121,7 +121,7 @@ func (s *writer) run() {
 		}
 
 		// write chunk
-		timeout := s.stream.Write(array[:num])
+		_, timeout := s.stream.Write(array[:num])
 
 		// await timeout
 		time.Sleep(timeout)

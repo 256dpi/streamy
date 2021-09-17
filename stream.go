@@ -18,7 +18,6 @@ type Config struct {
 	Name        string
 	Base        string
 	Info        func(string)
-	Queue       func(int)
 	SampleRate  int
 	BitRate     int
 	DeviceQueue int
@@ -84,20 +83,12 @@ func NewStream(config Config) *Stream {
 
 	// set message callback
 	svc.MessageCallback = func(msg *packet.Message) error {
-		// parse length
-		length, _ := strconv.Atoi(string(msg.Payload))
-
 		// acquire mutex
 		stream.mutex.Lock()
 		defer stream.mutex.Unlock()
 
-		// set queue
-		stream.queue = length
-
-		// run callback
-		if stream.config.Queue != nil {
-			stream.config.Queue(length)
-		}
+		// parse and set length
+		stream.queue, _ = strconv.Atoi(string(msg.Payload))
 
 		return nil
 	}
@@ -110,14 +101,14 @@ func (s *Stream) Connect() {
 	s.svc.Start(client.NewConfigWithClientID(s.config.Broker, s.config.Name))
 }
 
-func (s *Stream) Write(data []int) time.Duration {
+func (s *Stream) Write(data []int) (int, time.Duration) {
 	// acquire mutex
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	// check state
 	if !s.ready {
-		return 0
+		return s.queue, 0
 	}
 
 	// create writer
@@ -164,12 +155,7 @@ func (s *Stream) Write(data []int) time.Duration {
 	// increment queue
 	s.queue++
 
-	// emit queue
-	if s.config.Queue != nil {
-		s.config.Queue(s.queue)
-	}
-
-	return timeout
+	return s.queue, timeout
 }
 
 func (s *Stream) Reset() {

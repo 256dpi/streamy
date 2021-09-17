@@ -2,6 +2,8 @@ package main
 
 import (
 	"math"
+	"sync"
+	"time"
 
 	"github.com/256dpi/max-go"
 
@@ -12,18 +14,28 @@ type sender struct {
 	signal *max.Inlet
 	cmd    *max.Inlet
 	state  *max.Outlet
-	queue  *max.Outlet
+	info   *max.Outlet
 	stream *streamy.Stream
+	queue  int64
+	active bool
+	mutex  sync.Mutex
 }
 
 func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
+	// acquire mutex
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	// set active
+	s.active = true
+
 	// declare inlets
 	s.signal = obj.Inlet(max.Signal, "input", true)
 	s.cmd = obj.Inlet(max.Any, "commands", true)
 
 	// declare outlets
 	s.state = obj.Outlet(max.Int, "connection state")
-	s.queue = obj.Outlet(max.Int, "device queue")
+	s.info = obj.Outlet(max.Int, "device queue")
 
 	// get broker
 	var broker string
@@ -43,6 +55,26 @@ func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
 		base, _ = args[2].(string)
 	}
 
+	// run setter
+	go func() {
+		for {
+			time.Sleep(33 * time.Millisecond)
+			func() {
+				// acquire mutex
+				s.mutex.Lock()
+				defer s.mutex.Unlock()
+
+				// check active
+				if !s.active {
+					return
+				}
+
+				// emit queue
+				s.info.Int(s.queue)
+			}()
+		}
+	}()
+
 	// create stream
 	s.stream = streamy.NewStream(streamy.Config{
 		Broker: broker,
@@ -59,10 +91,6 @@ func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
 				max.Log(str)
 			}
 		},
-		Queue: func(length int) {
-			// set length
-			s.queue.Int(int64(length)) // TODO: Async?
-		},
 		SampleRate:  44100,
 		BitRate:     16,
 		DeviceQueue: 16,
@@ -72,6 +100,10 @@ func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
 }
 
 func (s *sender) Handle(_ int, msg string, args []max.Atom) {
+	// acquire mutex
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	// handle message
 	switch msg {
 	case "connect":
@@ -88,6 +120,10 @@ func (s *sender) Handle(_ int, msg string, args []max.Atom) {
 // TODO: Buffer some data before start writing?
 
 func (s *sender) Process(in, _ []float64) {
+	// acquire mutex
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	// convert data
 	data := make([]int, len(in))
 	for i, sample := range in {
@@ -95,10 +131,20 @@ func (s *sender) Process(in, _ []float64) {
 	}
 
 	// write data
-	s.stream.Write(data)
+	queue, _ := s.stream.Write(data)
+
+	// set queue
+	s.queue = int64(queue)
 }
 
 func (s *sender) Free() {
+	// acquire mutex
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	// set active
+	s.active = false
+
 	// disconnect
 	s.stream.Disconnect()
 }

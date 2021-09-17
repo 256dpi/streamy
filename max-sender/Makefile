@@ -1,12 +1,5 @@
-all: check build bundle
-
-check:
-	go fmt .
-	go vet .
-	golint .
-
 build:
-	maxgo -name streamy -cross -install streamy
+	maxgo -name streamy -install streamy # -cross
 
 #bundle:
 #	rm -f mqtt.zip
