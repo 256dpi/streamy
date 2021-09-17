@@ -61,7 +61,7 @@ func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
 		},
 		Queue: func(length int) {
 			// set length
-			s.queue.Int(int64(length))
+			s.queue.Int(int64(length)) // TODO: Async?
 		},
 		SampleRate:  44100,
 		BitRate:     16,

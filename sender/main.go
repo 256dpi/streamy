@@ -31,9 +31,6 @@ func main() {
 		Info: func(str string) {
 			fmt.Println("==>", str)
 		},
-		Queue: func(length int) {
-			fmt.Printf("==> queue: %d\n", length)
-		},
 		SampleRate:  sampleRate,
 		BitRate:     bitRate,
 		DeviceQueue: deviceQueue,

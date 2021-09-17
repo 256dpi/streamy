@@ -27,6 +27,7 @@ type Config struct {
 type Stream struct {
 	config  Config
 	svc     *client.Service
+	ready   bool
 	writer  *pcmWriter
 	encoder *wav.Encoder
 	queue   int
@@ -36,25 +37,49 @@ type Stream struct {
 func NewStream(config Config) *Stream {
 	// create service
 	svc := client.NewService(100)
+	svc.QueueTimeout = 0
 
 	// subscribe topics
 	svc.Subscribe(config.Base+"/queue", 0)
-
-	// set state callbacks
-	svc.OnlineCallback = func(resumed bool) {
-		config.Info("online")
-	}
-	svc.OfflineCallback = func() {
-		config.Info("offline")
-	}
-	svc.ErrorCallback = func(err error) {
-		config.Info(fmt.Sprintf("error: %s", err.Error()))
-	}
 
 	// prepare stream
 	stream := &Stream{
 		config: config,
 		svc:    svc,
+	}
+
+	// set state callbacks
+	svc.OnlineCallback = func(resumed bool) {
+		// acquire mutex
+		stream.mutex.Lock()
+		defer stream.mutex.Unlock()
+
+		// set state
+		stream.ready = true
+
+		// emit info
+		if config.Info != nil {
+			config.Info("online")
+		}
+	}
+	svc.OfflineCallback = func() {
+		// acquire mutex
+		stream.mutex.Lock()
+		defer stream.mutex.Unlock()
+
+		// set state
+		stream.ready = false
+
+		// emit info
+		if config.Info != nil {
+			config.Info("offline")
+		}
+	}
+	svc.ErrorCallback = func(err error) {
+		// emit info
+		if config.Info != nil {
+			config.Info(fmt.Sprintf("error: %s", err.Error()))
+		}
 	}
 
 	// set message callback
@@ -89,6 +114,11 @@ func (s *Stream) Write(data []int) time.Duration {
 	// acquire mutex
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	// check state
+	if !s.ready {
+		return 0
+	}
 
 	// create writer
 	if s.writer == nil {
@@ -133,6 +163,11 @@ func (s *Stream) Write(data []int) time.Duration {
 
 	// increment queue
 	s.queue++
+
+	// emit queue
+	if s.config.Queue != nil {
+		s.config.Queue(s.queue)
+	}
 
 	return timeout
 }
