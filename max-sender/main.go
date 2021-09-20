@@ -2,6 +2,8 @@ package main
 
 import (
 	"math"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,6 +57,21 @@ func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
 		baseTopic, _ = args[2].(string)
 	}
 
+	// get queue data
+	var deviceQueue int
+	var maxQueue int
+	if len(args) > 3 {
+		seg := strings.Split(args[3].(string)+"/", "/")
+		deviceQueue, _ = strconv.Atoi(seg[0])
+		maxQueue, _ = strconv.Atoi(seg[1])
+	}
+	if deviceQueue == 0 {
+		deviceQueue = 16
+	}
+	if maxQueue == 0 {
+		maxQueue = 32
+	}
+
 	// queue emitter
 	go func() {
 		for {
@@ -93,7 +110,8 @@ func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
 		},
 		SampleRate:  44100,
 		BitRate:     16,
-		DeviceQueue: 16,
+		DeviceQueue: deviceQueue,
+		MaxQueue:    maxQueue,
 	})
 
 	return true
