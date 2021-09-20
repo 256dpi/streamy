@@ -158,6 +158,14 @@ func (s *Stream) Write(data []int) (int, time.Duration) {
 	return s.queue, timeout
 }
 
+func (s *Stream) Queue() int {
+	// acquire mutex
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	return s.queue
+}
+
 func (s *Stream) Reset() {
 	// acquire mutex
 	s.mutex.Lock()

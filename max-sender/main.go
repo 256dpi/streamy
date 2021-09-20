@@ -70,7 +70,7 @@ func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
 				}
 
 				// emit queue
-				s.info.Int(s.queue)
+				s.info.Int(int64(s.stream.Queue()))
 			}()
 		}
 	}()
@@ -131,10 +131,7 @@ func (s *sender) Process(in, _ []float64) {
 	}
 
 	// write data
-	queue, _ := s.stream.Write(data)
-
-	// set queue
-	s.queue = int64(queue)
+	s.stream.Write(data)
 }
 
 func (s *sender) Free() {
