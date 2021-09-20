@@ -35,6 +35,8 @@ typedef struct {
 
 static QueueHandle_t snd_queue;
 
+static volatile bool snd_on = false;
+
 static void snd_task() {
   // prepare command
   snd_command_t cmd;
@@ -64,19 +66,14 @@ static void snd_task() {
 }
 
 void snd_monitor() {
-  // prepare last update
-  uint32_t last_update = naos_millis();
-
   for (;;) {
-    // check last update
-    uint32_t now = naos_millis();
-    if (last_update + SND_UPDATE_MS < now) {
-      last_update = now;
+    // sleep
+    naos_delay(SND_UPDATE_MS);
+
+    // publish length
+    if (snd_on) {
       naos_publish_l("queue", (int32_t)uxQueueMessagesWaiting(snd_queue), 0, false, NAOS_LOCAL);
     }
-
-    // sleep
-    naos_delay(10);
   }
 }
 
@@ -114,6 +111,8 @@ void snd_init() {
   xTaskCreatePinnedToCore(snd_task, "snd-t", 2048, NULL, 2, NULL, 1);
   xTaskCreatePinnedToCore(snd_monitor, "snd-m", 2048, NULL, 2, NULL, 1);
 }
+
+void snd_state(bool on) { snd_on = on; }
 
 void snd_write(uint8_t* data, size_t length) {
   // copy chunk
