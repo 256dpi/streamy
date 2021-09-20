@@ -21,6 +21,7 @@ type Config struct {
 	SampleRate  int
 	BitRate     int
 	DeviceQueue int
+	MaxQueue    int
 }
 
 type Stream struct {
@@ -108,6 +109,11 @@ func (s *Stream) Write(samples []int) (int, time.Duration) {
 
 	// check state
 	if !s.ready {
+		return s.queue, 0
+	}
+
+	// check queue
+	if s.queue >= s.config.MaxQueue {
 		return s.queue, 0
 	}
 
