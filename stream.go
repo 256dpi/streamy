@@ -101,7 +101,7 @@ func (s *Stream) Connect() {
 	s.svc.Start(client.NewConfigWithClientID(s.config.Broker, s.config.Name))
 }
 
-func (s *Stream) Write(data []int) (int, time.Duration) {
+func (s *Stream) Write(samples []int) (int, time.Duration) {
 	// acquire mutex
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -127,7 +127,7 @@ func (s *Stream) Write(data []int) (int, time.Duration) {
 			NumChannels: 1,
 			SampleRate:  s.config.SampleRate,
 		},
-		Data:           data,
+		Data:           samples,
 		SourceBitDepth: 16,
 	}
 
@@ -145,7 +145,7 @@ func (s *Stream) Write(data []int) (int, time.Duration) {
 	s.svc.Publish(s.config.Base+"/write", chunk, 0, false)
 
 	// determine timeout
-	timeout := time.Second * time.Duration(len(data)) / time.Duration(s.config.SampleRate)
+	timeout := time.Second * time.Duration(len(samples)) / time.Duration(s.config.SampleRate)
 	if s.queue < 2 {
 		timeout = 0
 	} else if s.queue < s.config.DeviceQueue/2 {

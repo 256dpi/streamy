@@ -102,9 +102,6 @@ func (s *writer) run() {
 	// prepare input buffer 1152 samples (~26ms) @ 16bit/2CH
 	input := make([]byte, 1152*4)
 
-	// prepare integer array
-	var array [1152]int
-
 	// writer audio
 	for {
 		// read sample
@@ -113,15 +110,14 @@ func (s *writer) run() {
 			panic(err)
 		}
 
-		// fill array
-		var num int
+		// convert sample
+		samples := make([]int, n/4)
 		for i := 0; i < n; i += 4 {
-			num++
-			array[i/4] = int(int16(binary.LittleEndian.Uint16(input[i:])))
+			samples[i/4] = int(int16(binary.LittleEndian.Uint16(input[i:])))
 		}
 
 		// write chunk
-		_, timeout := s.stream.Write(array[:num])
+		_, timeout := s.stream.Write(samples)
 
 		// await timeout
 		time.Sleep(timeout)
