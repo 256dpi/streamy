@@ -109,10 +109,13 @@ void snd_init() {
 
   // run task
   xTaskCreatePinnedToCore(snd_task, "snd-t", 2048, NULL, 2, NULL, 1);
-  xTaskCreatePinnedToCore(snd_monitor, "snd-m", 2048, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(snd_monitor, "snd-m", 2048, NULL, 3, NULL, 1);
 }
 
-void snd_state(bool on) { snd_on = on; }
+void snd_state(bool on) {
+  // set state
+  snd_on = on;
+}
 
 void snd_write(uint8_t* data, size_t length) {
   // copy chunk
