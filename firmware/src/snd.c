@@ -39,9 +39,6 @@ static void snd_task() {
   // prepare command
   snd_command_t cmd;
 
-  // prepare last update
-  uint32_t last_update = naos_millis();
-
   for (;;) {
     // await next command
     xQueueReceive(snd_queue, &cmd, portMAX_DELAY);
@@ -61,6 +58,16 @@ static void snd_task() {
     size_t bytes_written = 0;
     ESP_ERROR_CHECK(i2s_write(SND_I2S_NUM, cmd.chunk, cmd.length, &bytes_written, portMAX_DELAY))
 
+    // free chunk
+    free(cmd.chunk);
+  }
+}
+
+void snd_monitor() {
+  // prepare last update
+  uint32_t last_update = naos_millis();
+
+  for (;;) {
     // check last update
     uint32_t now = naos_millis();
     if (last_update + SND_UPDATE_MS < now) {
@@ -68,8 +75,8 @@ static void snd_task() {
       naos_publish_l("queue", (int32_t)uxQueueMessagesWaiting(snd_queue), 0, false, NAOS_LOCAL);
     }
 
-    // free chunk
-    free(cmd.chunk);
+    // sleep
+    naos_delay(10);
   }
 }
 
@@ -104,7 +111,8 @@ void snd_init() {
   ESP_ERROR_CHECK(i2s_zero_dma_buffer(SND_I2S_NUM))
 
   // run task
-  xTaskCreatePinnedToCore(snd_task, "snd", 2048, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(snd_task, "snd-t", 2048, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(snd_monitor, "snd-m", 2048, NULL, 2, NULL, 1);
 }
 
 void snd_write(uint8_t* data, size_t length) {

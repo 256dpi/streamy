@@ -33,9 +33,9 @@ static naos_config_t config = {
 };
 
 void app_main() {
-  // initialize sound
-  snd_init();
-
   // initialize naos
   naos_init(&config);
+
+  // initialize sound
+  snd_init();
 }
