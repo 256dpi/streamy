@@ -17,7 +17,7 @@ import (
 //go:embed sound.mp3
 var sound []byte
 
-const broker = "mqtt://localhost:1883"
+const brokerURL = "mqtt://localhost:1883"
 const sampleRate = 44100
 const bitRate = 16
 const deviceQueue = 16
@@ -25,10 +25,10 @@ const deviceQueue = 16
 func main() {
 	// create writer
 	stream := streamy.NewStream(streamy.Config{
-		Broker: broker,
-		Name:   "sender",
-		Base:   "/test",
-		Info: func(str string) {
+		BrokerURL: brokerURL,
+		ClientID:  "sender",
+		BaseTopic: "/test",
+		InfoFunc: func(str string) {
 			fmt.Println("==>", str)
 		},
 		SampleRate:  sampleRate,

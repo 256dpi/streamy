@@ -37,25 +37,25 @@ func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
 	s.state = obj.Outlet(max.Int, "connection state")
 	s.info = obj.Outlet(max.Int, "device queue")
 
-	// get broker
-	var broker string
+	// get broker URL
+	var brokerURL string
 	if len(args) > 0 {
-		broker, _ = args[0].(string)
+		brokerURL, _ = args[0].(string)
 	}
 
-	// get name
-	var name string
+	// get client ID
+	var clientID string
 	if len(args) > 1 {
-		name, _ = args[1].(string)
+		clientID, _ = args[1].(string)
 	}
 
-	// get base
-	var base string
+	// get base topic
+	var baseTopic string
 	if len(args) > 2 {
-		base, _ = args[2].(string)
+		baseTopic, _ = args[2].(string)
 	}
 
-	// run setter
+	// queue emitter
 	go func() {
 		for {
 			time.Sleep(33 * time.Millisecond)
@@ -77,10 +77,10 @@ func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
 
 	// create stream
 	s.stream = streamy.NewStream(streamy.Config{
-		Broker: broker,
-		Name:   name,
-		Base:   base,
-		Info: func(str string) {
+		BrokerURL: brokerURL,
+		ClientID:  clientID,
+		BaseTopic: baseTopic,
+		InfoFunc: func(str string) {
 			// handle message
 			switch str {
 			case "online":
@@ -99,7 +99,7 @@ func (s *sender) Init(obj *max.Object, args []max.Atom) bool {
 	return true
 }
 
-func (s *sender) Handle(_ int, msg string, args []max.Atom) {
+func (s *sender) Handle(_ int, msg string, _ []max.Atom) {
 	// acquire mutex
 	s.mutex.Lock()
 	defer s.mutex.Unlock()

@@ -14,10 +14,10 @@ import (
 )
 
 type Config struct {
-	Broker      string
-	Name        string
-	Base        string
-	Info        func(string)
+	BrokerURL   string
+	ClientID    string
+	BaseTopic   string
+	InfoFunc    func(string)
 	SampleRate  int
 	BitRate     int
 	DeviceQueue int
@@ -39,7 +39,7 @@ func NewStream(config Config) *Stream {
 	svc.QueueTimeout = 0
 
 	// subscribe topics
-	svc.Subscribe(config.Base+"/queue", 0)
+	svc.Subscribe(config.BaseTopic+"/queue", 0)
 
 	// prepare stream
 	stream := &Stream{
@@ -57,8 +57,8 @@ func NewStream(config Config) *Stream {
 		stream.ready = true
 
 		// emit info
-		if config.Info != nil {
-			config.Info("online")
+		if config.InfoFunc != nil {
+			config.InfoFunc("online")
 		}
 	}
 	svc.OfflineCallback = func() {
@@ -70,14 +70,14 @@ func NewStream(config Config) *Stream {
 		stream.ready = false
 
 		// emit info
-		if config.Info != nil {
-			config.Info("offline")
+		if config.InfoFunc != nil {
+			config.InfoFunc("offline")
 		}
 	}
 	svc.ErrorCallback = func(err error) {
 		// emit info
-		if config.Info != nil {
-			config.Info(fmt.Sprintf("error: %s", err.Error()))
+		if config.InfoFunc != nil {
+			config.InfoFunc(fmt.Sprintf("error: %s", err.Error()))
 		}
 	}
 
@@ -98,7 +98,7 @@ func NewStream(config Config) *Stream {
 
 func (s *Stream) Connect() {
 	// start service
-	s.svc.Start(client.NewConfigWithClientID(s.config.Broker, s.config.Name))
+	s.svc.Start(client.NewConfigWithClientID(s.config.BrokerURL, s.config.ClientID))
 }
 
 func (s *Stream) Write(samples []int) (int, time.Duration) {
@@ -142,7 +142,7 @@ func (s *Stream) Write(samples []int) (int, time.Duration) {
 	s.writer.Reset()
 
 	// send chunk
-	s.svc.Publish(s.config.Base+"/write", chunk, 0, false)
+	s.svc.Publish(s.config.BaseTopic+"/write", chunk, 0, false)
 
 	// determine timeout
 	timeout := time.Second * time.Duration(len(samples)) / time.Duration(s.config.SampleRate)
@@ -176,7 +176,7 @@ func (s *Stream) Reset() {
 	s.encoder = nil
 
 	// send stop
-	s.svc.Publish(s.config.Base+"/stop", nil, 0, false)
+	s.svc.Publish(s.config.BaseTopic+"/stop", nil, 0, false)
 }
 
 func (s *Stream) Disconnect() {
