@@ -17,7 +17,7 @@ import (
 //go:embed sound.mp3
 var sound []byte
 
-const brokerURL = "mqtt://localhost:1883"
+const brokerURL = "mqtt://localhost:2883"
 const sampleRate = 44100
 const bitRate = 16
 const deviceQueue = 16
@@ -34,6 +34,7 @@ func main() {
 		SampleRate:  sampleRate,
 		BitRate:     bitRate,
 		DeviceQueue: deviceQueue,
+		MaxQueue:    32,
 	})
 
 	// connect
