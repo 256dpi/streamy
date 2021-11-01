@@ -33,7 +33,7 @@ void app_main() {
       .pin_clk = 12,
       .pin_data = 13,
       .pin_lrc = 14,
-      .sample_rate = 441000,
+      .sample_rate = 44100,
       .bit_rate = 16,
       .dma_chunk_length = 10,
       .dma_chunk_num = 3,
