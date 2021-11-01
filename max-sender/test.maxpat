@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 512.0, 224.0, 1191.0, 814.0 ],
+		"rect" : [ 511.0, 224.0, 1191.0, 814.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -371,8 +371,8 @@
 					"numinlets" : 2,
 					"numoutlets" : 2,
 					"outlettype" : [ "int", "int" ],
-					"patching_rect" : [ 409.0, 437.0, 267.0, 22.0 ],
-					"text" : "streamy mqtt://0.0.0.0:2883 sender /test/streamy"
+					"patching_rect" : [ 409.0, 437.0, 221.0, 22.0 ],
+					"text" : "streamy mqtt://0.0.0.0:2883 sender /test"
 				}
 
 			}
