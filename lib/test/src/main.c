@@ -1,7 +1,7 @@
 #include <naos.h>
 #include <string.h>
 
-#include <snd.h>
+#include <streamy.h>
 
 static void online() {
   // subscribe topics
@@ -12,12 +12,12 @@ static void online() {
 static void message(const char *topic, uint8_t *payload, size_t len, naos_scope_t scope) {
   // handle write
   if (scope == NAOS_LOCAL && strcmp(topic, "write") == 0) {
-    snd_write(payload, len);
+    streamy_write(payload, len);
   }
 
   // handle stop
   if (scope == NAOS_LOCAL && strcmp(topic, "stop") == 0) {
-    snd_stop();
+    streamy_stop();
   }
 }
 
@@ -37,5 +37,5 @@ void app_main() {
   naos_init(&config);
 
   // initialize sound
-  snd_init();
+  streamy_init();
 }

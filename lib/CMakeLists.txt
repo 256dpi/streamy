@@ -11,7 +11,7 @@ include_directories(
         test/esp-idf/components/log/include
         include/)
 
-set(SOURCE_FILES snd.c snd.h test/src/main.c)
+set(SOURCE_FILES streamy.c streamy.h test/src/main.c)
 
 add_library(streamy ${SOURCE_FILES})
 

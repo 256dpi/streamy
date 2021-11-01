@@ -3,7 +3,7 @@
   "overrides": null,
   "components": {
     "streamy": {
-      "path": ".."
+      "path": "../.."
     }
   },
   "broker": "mqtts://key:secret@example.org",
