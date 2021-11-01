@@ -4,21 +4,13 @@
 #include <streamy.h>
 
 static void online() {
-  // subscribe topics
-  naos_subscribe("write", 0, NAOS_LOCAL);
-  naos_subscribe("stop", 0, NAOS_LOCAL);
+  // setup
+  streamy_setup();
 }
 
 static void message(const char *topic, uint8_t *payload, size_t len, naos_scope_t scope) {
-  // handle write
-  if (scope == NAOS_LOCAL && strcmp(topic, "write") == 0) {
-    streamy_write(payload, len);
-  }
-
-  // handle stop
-  if (scope == NAOS_LOCAL && strcmp(topic, "stop") == 0) {
-    streamy_stop();
-  }
+  // handle
+  streamy_handle(topic, payload, len, scope);
 }
 
 static naos_param_t params[] = {};
@@ -43,10 +35,10 @@ void app_main() {
       .pin_lrc = 14,
       .sample_rate = 441000,
       .bit_rate = 16,
-      .queue_length= 16,
-      .update_rate = 100,
       .dma_chunk_length = 10,
       .dma_chunk_num = 3,
+      .queue_length = 16,
+      .update_rate = 100,
   };
 
   // initialize
