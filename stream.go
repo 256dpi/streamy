@@ -40,7 +40,7 @@ func NewStream(config Config) *Stream {
 	svc.QueueTimeout = 0
 
 	// subscribe topics
-	svc.Subscribe(config.BaseTopic+"/queue", 0)
+	svc.Subscribe(config.BaseTopic+"/streamy/queue", 0)
 
 	// prepare stream
 	stream := &Stream{
@@ -148,7 +148,7 @@ func (s *Stream) Write(samples []int) (int, time.Duration) {
 	s.writer.Reset()
 
 	// send chunk
-	s.svc.Publish(s.config.BaseTopic+"/write", chunk, 0, false)
+	s.svc.Publish(s.config.BaseTopic+"/streamy/write", chunk, 0, false)
 
 	// determine timeout
 	timeout := time.Second * time.Duration(len(samples)) / time.Duration(s.config.SampleRate)
@@ -182,7 +182,7 @@ func (s *Stream) Reset() {
 	s.encoder = nil
 
 	// send stop
-	s.svc.Publish(s.config.BaseTopic+"/stop", nil, 0, false)
+	s.svc.Publish(s.config.BaseTopic+"/streamy/stop", nil, 0, false)
 }
 
 func (s *Stream) Disconnect() {
