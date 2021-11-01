@@ -36,6 +36,19 @@ void app_main() {
   // initialize naos
   naos_init(&config);
 
-  // initialize sound
-  streamy_init();
+  // prepare config sound
+  streamy_config_t config = {
+      .pin_clk = 0,
+      .pin_data = 0,
+      .pin_lrc = 0,
+      .sample_rate = 441000,
+      .bit_rate = 16,
+      .queue_length= 16,
+      .update_rate = 100,
+      .dma_chunk_length = 10,
+      .dma_chunk_num = 3,
+  };
+
+  // initialize
+  streamy_init(config);
 }
