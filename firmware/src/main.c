@@ -7,9 +7,6 @@ static void online() {
   // subscribe topics
   naos_subscribe("write", 0, NAOS_LOCAL);
   naos_subscribe("stop", 0, NAOS_LOCAL);
-
-  // set state
-  snd_state(true);
 }
 
 static void message(const char *topic, uint8_t *payload, size_t len, naos_scope_t scope) {
@@ -24,11 +21,6 @@ static void message(const char *topic, uint8_t *payload, size_t len, naos_scope_
   }
 }
 
-static void offline() {
-  // set state
-  snd_state(false);
-}
-
 static naos_param_t params[] = {};
 
 static naos_config_t config = {
@@ -37,7 +29,6 @@ static naos_config_t config = {
     .parameters = params,
     .num_parameters = sizeof(params) / sizeof(naos_param_t),
     .online_callback = online,
-    .offline_callback = offline,
     .message_callback = message,
 };
 
