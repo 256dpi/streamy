@@ -58,7 +58,7 @@ void streamy_monitor() {
 
     // publish length
     if (naos_status() == NAOS_NETWORKED) {
-      naos_publish_l("queue", (int32_t)uxQueueMessagesWaiting(streamy_queue), 0, false, NAOS_LOCAL);
+      naos_publish_l("streamy/queue", (int32_t)uxQueueMessagesWaiting(streamy_queue), 0, false, NAOS_LOCAL);
     }
   }
 }
@@ -102,6 +102,24 @@ void streamy_init(streamy_config_t config) {
   // run task
   xTaskCreatePinnedToCore(streamy_task, "streamy-t", 2048, NULL, 2, NULL, 1);
   xTaskCreatePinnedToCore(streamy_monitor, "streamy-m", 2048, NULL, 3, NULL, 1);
+}
+
+void streamy_setup() {
+  // subscribe topics
+  naos_subscribe("streamy/write", 0, NAOS_LOCAL);
+  naos_subscribe("streamy/stop", 0, NAOS_LOCAL);
+}
+
+void streamy_handle(const char* topic, uint8_t* payload, size_t len, naos_scope_t scope) {
+  // handle write
+  if (scope == NAOS_LOCAL && strcmp(topic, "streamy/write") == 0) {
+    streamy_write(payload, len);
+  }
+
+  // handle stop
+  if (scope == NAOS_LOCAL && strcmp(topic, "streamy/stop") == 0) {
+    streamy_stop();
+  }
 }
 
 void streamy_write(uint8_t* data, size_t length) {
