@@ -1,7 +1,11 @@
 {
   "version": "master",
   "overrides": null,
-  "components": {},
+  "components": {
+    "streamy": {
+      "path": ".."
+    }
+  },
   "broker": "mqtts://key:secret@example.org",
   "devices": {}
 }

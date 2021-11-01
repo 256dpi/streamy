@@ -1,7 +1,7 @@
 #include <naos.h>
 #include <string.h>
 
-#include "snd.h"
+#include <snd.h>
 
 static void online() {
   // subscribe topics
