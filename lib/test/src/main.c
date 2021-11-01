@@ -38,9 +38,9 @@ void app_main() {
 
   // prepare config sound
   streamy_config_t config = {
-      .pin_clk = 0,
-      .pin_data = 0,
-      .pin_lrc = 0,
+      .pin_clk = 12,
+      .pin_data = 13,
+      .pin_lrc = 14,
       .sample_rate = 441000,
       .bit_rate = 16,
       .queue_length= 16,
