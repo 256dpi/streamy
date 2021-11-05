@@ -51,7 +51,7 @@ static void streamy_task() {
   }
 }
 
-void streamy_monitor() {
+static void streamy_monitor() {
   for (;;) {
     // sleep
     naos_delay(streamy_config.update_rate);
@@ -59,6 +59,16 @@ void streamy_monitor() {
     // publish length
     if (naos_status() == NAOS_NETWORKED) {
       naos_publish_l("streamy/queue", (int32_t)uxQueueMessagesWaiting(streamy_queue), 0, false, NAOS_LOCAL);
+    }
+  }
+}
+
+static void streamy_make_room() {
+  // check space
+  if (!uxQueueSpacesAvailable(streamy_queue)) {
+    streamy_command_t _cmd;
+    if (!xQueueReceive(streamy_queue, &_cmd, 0)) {
+      naos_log("streamy: failed to make room in queue");
     }
   }
 }
@@ -123,6 +133,9 @@ void streamy_handle(const char* topic, uint8_t* payload, size_t len, naos_scope_
 }
 
 void streamy_write(uint8_t* data, size_t length) {
+  // make room
+  streamy_make_room();
+
   // copy chunk
   uint8_t* chunk = malloc(length);
   memcpy(chunk, data, length);
@@ -135,19 +148,22 @@ void streamy_write(uint8_t* data, size_t length) {
   };
 
   // send command
-  if (!xQueueSend(streamy_queue, &cmd, portMAX_DELAY)) {
-    naos_log("streamy: failed to queue play command");
+  if (!xQueueSend(streamy_queue, &cmd, 0)) {
+    naos_log("streamy: failed to queue write command");
   }
 }
 
 void streamy_stop() {
+  // make room
+  streamy_make_room();
+
   // prepare command
   streamy_command_t cmd = {
       .type = STREAMY_COMMAND_STOP,
   };
 
   // send command
-  if (!xQueueSend(streamy_queue, &cmd, portMAX_DELAY)) {
+  if (!xQueueSend(streamy_queue, &cmd, 0)) {
     naos_log("streamy: failed to queue stop command");
   }
 }
